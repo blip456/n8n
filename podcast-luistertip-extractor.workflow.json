@@ -139,7 +139,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:9000/v1/audio/transcriptions",
+        "url": "http://whisper:8000/v1/audio/transcriptions",
         "authentication": "none",
         "contentType": "multipart-form-data",
         "bodyParameters": {

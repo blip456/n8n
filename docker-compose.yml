@@ -1,0 +1,55 @@
+services:
+
+  # ── n8n workflow engine ────────────────────────────────────────────────────
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # Store binary files (podcast audio) on disk instead of RAM
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
+      - N8N_BINARY_DATA_TTL=120
+      # Allow HTTP cookies on localhost (no HTTPS needed locally)
+      - N8N_SECURE_COOKIE=false
+      # Prune old execution logs after 7 days to save disk space
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+    volumes:
+      # Persist n8n data, credentials and settings across restarts
+      - n8n_data:/home/node/.n8n
+      # Mount workflow JSON so it gets auto-imported on first start
+      - ./podcast-luistertip-extractor.workflow.json:/data/workflow.json:ro
+    # Import the workflow then start n8n (import is safe to run on every start)
+    command: >
+      sh -c "n8n import:workflow --input=/data/workflow.json ; exec n8n"
+    depends_on:
+      - whisper
+
+  # ── faster-whisper transcription server ───────────────────────────────────
+  whisper:
+    # CPU version. Swap tag to :latest-cuda for NVIDIA GPU (add 'deploy' section below).
+    image: fedirz/faster-whisper-server:latest-cpu
+    restart: unless-stopped
+    environment:
+      # large-v3 is the most accurate model for Dutch/Flemish.
+      # Downloaded automatically on first start (~1.5 GB, takes a few minutes).
+      # Faster but less accurate alternatives: medium, small, base
+      - WHISPER__MODEL=large-v3
+    volumes:
+      # Cache downloaded models so they survive container restarts
+      - whisper_models:/root/.cache/huggingface
+
+    # ── Uncomment this block if you have an NVIDIA GPU ──────────────────────
+    # Also change the image tag above to :latest-cuda
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  n8n_data:
+  whisper_models:
